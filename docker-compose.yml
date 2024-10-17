@@ -1,0 +1,61 @@
+services:
+  client-gateway:
+    build: ./client-gateway
+    restart: always
+    environment:
+      - MS_NATS_SERVERS=nats://nats-server:4222
+      - PORT=3000
+      - MS_NATS_SERVICE=NATS_SERVICE
+    ports:
+      - ${CLIENT_GATEWAY_PORT}:3000
+    volumes: 
+      - ./client-gateway/src:/usr/src/app/src:cached
+    command: npm run start:dev
+
+  
+  nats-server:
+    image: nats
+    restart: always
+    ports:
+      - 8222:8222
+
+
+  orders-ms:
+    depends_on: 
+      - orders-db
+    build: ./orders-ms
+    restart: always
+    environment:
+      - MS_NATS_SERVERS=nats://nats-server:4222
+      - PORT=3000
+      - MS_NATS_SERVICE=NATS_SERVICE
+      - DATABASE_URL=postgresql://postgres:123456@orders-db:5432/ordersdb?schema=public
+    volumes: 
+      - ./orders-ms/src:/usr/src/app/src:cached
+      - ./orders-ms/prisma:/usr/src/app/prisma:cached
+    command: npm run docker:start
+
+
+  orders-db:
+    image: postgres:16.2
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=123456
+      - POSTGRES_DB=ordersdb
+    volumes:
+      - ./orders-ms/postgres:/var/lib/postgresql/data:cached
+
+
+  products-ms:
+    build: ./products-ms
+    restart: always
+    environment:
+      - MS_NATS_SERVERS=nats://nats-server:4222
+      - PORT=3000
+      - MS_NATS_SERVICE=NATS_SERVICE
+      - DATABASE_URL=file:./dev.db
+    volumes: 
+      - ./products-ms/src:/usr/src/app/src:cached
+      - ./products-ms/prisma:/usr/src/app/prisma:cached
+    command: npm run docker:start
